@@ -1,11 +1,10 @@
 from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D
+from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D, Cropping2D
 
 import csv
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-
 
 images = []
 steering_angles = []
@@ -16,12 +15,48 @@ with open('data/driving_log.csv') as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
 
     for row in reader:
-        center_image_path, steering_angle = row[0], row[3]
+        center_image_path = row[0]
+        left_image_path = row[1]
+        right_image_path = row[2]
 
-        img = cv2.imread(center_image_path)
+        correction = 0.2
+        center_steering_angle = float(row[3])
+        left_steering_angle = center_steering_angle - correction
+        right_steering_angle = center_steering_angle + correction
 
-        images.append(img)
-        steering_angles.append(float(steering_angle))
+        center_img = cv2.imread(center_image_path)
+        left_img = cv2.imread(left_image_path)
+        right_img = cv2.imread(right_image_path)
+
+        # center
+
+        images.append(center_img)
+        steering_angles.append(center_steering_angle)
+
+        # flip image and steering angle
+
+        images.append(np.fliplr(center_img))
+        steering_angles.append(-center_steering_angle)
+
+        # left
+
+        images.append(left_img)
+        steering_angles.append(left_steering_angle)
+
+        # flip image and steering angle
+
+        images.append(np.fliplr(left_img))
+        steering_angles.append(-left_steering_angle)
+
+        # right
+
+        images.append(right_img)
+        steering_angles.append(float(right_steering_angle))
+
+        # flip image and steering angle
+
+        images.append(np.fliplr(right_img))
+        steering_angles.append(-(float(right_steering_angle)))
 
 # 2. populate X_train and y_train
 
@@ -32,6 +67,7 @@ y_train = np.array(steering_angles)
 
 model = Sequential()
 model.add(Lambda(lambda image: image / 255.0 - 0.5, input_shape=(160, 320, 3)))
+model.add(Cropping2D(cropping=((50, 20), (0, 0))))
 model.add(Conv2D(6, 5, strides=(1, 1), padding='valid', activation='relu'))
 model.add(MaxPool2D(pool_size=(2, 2)))
 model.add(Conv2D(6, 5, strides=(1, 1), padding='valid', activation='relu'))
@@ -48,7 +84,7 @@ model.compile(optimizer='adam', loss='mse')
 
 # 5. fit the model
 
-history = model.fit(X_train, y_train, epochs=5, validation_split=0.2, shuffle=True)
+history = model.fit(X_train, y_train, epochs=3, validation_split=0.2, shuffle=True)
 
 # 6. summarize history for loss
 
