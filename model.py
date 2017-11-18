@@ -1,5 +1,5 @@
 from keras.models import Sequential
-from keras.layers import Dense, Flatten
+from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D
 
 import csv
 import cv2
@@ -31,7 +31,16 @@ y_train = np.array(steering_angles)
 # 3. create the model
 
 model = Sequential()
-model.add(Flatten(input_shape=(160, 320, 3)))
+model.add(Lambda(lambda image: image / 255.0 - 0.5, input_shape=(160, 320, 3)))
+model.add(Conv2D(6, 5, strides=(1, 1), padding='valid', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Conv2D(6, 5, strides=(1, 1), padding='valid', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Flatten())
+model.add(Dense(120))
+model.add(Dropout(0.75))
+model.add(Dense(84))
+model.add(Dropout(0.75))
 model.add(Dense(1))
 
 # 4. compile the model
@@ -39,7 +48,7 @@ model.compile(optimizer='adam', loss='mse')
 
 # 5. fit the model
 
-history = model.fit(X_train, y_train, nb_epoch=10, validation_split=0.2, shuffle=True)
+history = model.fit(X_train, y_train, epochs=5, validation_split=0.2, shuffle=True)
 
 # 6. summarize history for loss
 
