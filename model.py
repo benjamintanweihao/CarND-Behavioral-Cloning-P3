@@ -6,62 +6,70 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-images = []
-steering_angles = []
 
 # 1. read csv
 
-with open('data/driving_log.csv') as csvfile:
-    reader = csv.reader(csvfile, delimiter=',')
+def populate_data(path_to_csv):
+    images = []
+    steering_angles = []
 
-    for row in reader:
-        center_image_path = row[0]
-        left_image_path = row[1]
-        right_image_path = row[2]
+    with open(path_to_csv) as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
 
-        correction = 0.2
-        center_steering_angle = float(row[3])
-        left_steering_angle = center_steering_angle - correction
-        right_steering_angle = center_steering_angle + correction
+        for row in reader:
+            center_image_path = row[0]
+            left_image_path = row[1]
+            right_image_path = row[2]
 
-        center_img = cv2.imread(center_image_path)
-        left_img = cv2.imread(left_image_path)
-        right_img = cv2.imread(right_image_path)
+            correction = 0.4
+            center_steering_angle = float(row[3])
+            left_steering_angle = center_steering_angle + correction
+            right_steering_angle = center_steering_angle - correction
 
-        # center
+            center_img = cv2.imread(center_image_path)
+            left_img = cv2.imread(left_image_path)
+            right_img = cv2.imread(right_image_path)
 
-        images.append(center_img)
-        steering_angles.append(center_steering_angle)
+            # center
 
-        # flip image and steering angle
+            images.append(center_img)
+            steering_angles.append(center_steering_angle)
 
-        images.append(np.fliplr(center_img))
-        steering_angles.append(-center_steering_angle)
+            # flip image and steering angle
 
-        # left
+            images.append(np.fliplr(center_img))
+            steering_angles.append(-center_steering_angle)
 
-        images.append(left_img)
-        steering_angles.append(left_steering_angle)
+            # left
 
-        # flip image and steering angle
+            images.append(left_img)
+            steering_angles.append(left_steering_angle)
 
-        images.append(np.fliplr(left_img))
-        steering_angles.append(-left_steering_angle)
+            # flip image and steering angle
 
-        # right
+            images.append(np.fliplr(left_img))
+            steering_angles.append(-left_steering_angle)
 
-        images.append(right_img)
-        steering_angles.append(float(right_steering_angle))
+            # right
 
-        # flip image and steering angle
+            images.append(right_img)
+            steering_angles.append(float(right_steering_angle))
 
-        images.append(np.fliplr(right_img))
-        steering_angles.append(-(float(right_steering_angle)))
+            # flip image and steering angle
+
+            images.append(np.fliplr(right_img))
+            steering_angles.append(-(float(right_steering_angle)))
+
+        return images, steering_angles
+
 
 # 2. populate X_train and y_train
 
-X_train = np.array(images)
-y_train = np.array(steering_angles)
+track_1_images, track_1_steering_angles = populate_data('data/track_1/driving_log.csv')
+track_1_opp_images, track_1_opp_steering_angles = populate_data('data/track_1_opp/driving_log.csv')
+
+X_train = np.array(track_1_images + track_1_opp_images)
+y_train = np.array(track_1_steering_angles + track_1_opp_steering_angles)
 
 # 3. create the model
 
@@ -79,12 +87,14 @@ model.add(Dense(84))
 model.add(Dropout(0.75))
 model.add(Dense(1))
 
+model.summary()
+
 # 4. compile the model
 model.compile(optimizer='adam', loss='mse')
 
 # 5. fit the model
 
-history = model.fit(X_train, y_train, epochs=3, validation_split=0.2, shuffle=True)
+history = model.fit(X_train, y_train, epochs=2, validation_split=0.2, shuffle=True)
 
 # 6. summarize history for loss
 
