@@ -69,6 +69,9 @@ def pipeline(image, steering_angle):
 
     return image, steering_angle
 
+def blur(image, kernel_size=5):
+    blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+    return blurred
 
 def generator(X, y, batch_size=32):
     X_batch = np.zeros(shape=(batch_size, 66, 200, 3), dtype=np.uint8)
