@@ -48,10 +48,14 @@ def populate_data(path_to_csv):
 # 1. populate X_train and y_train
 
 track_1_images, track_1_steering_angles = populate_data('data/track_1/driving_log.csv')
-track_1_opp_images, track_1_opp_steering_angles = populate_data('data/track_1_opp/driving_log.csv')
+# track_1_opp_images, track_1_opp_steering_angles = populate_data('data/track_1_opp/driving_log.csv')
+track_2_images, track_2_steering_angles = populate_data('data/track_2/driving_log.csv')
 
-images = track_1_images + track_1_opp_images
-steering_angles = track_1_steering_angles + track_1_opp_steering_angles
+images = track_1_images + track_2_images
+steering_angles = track_1_steering_angles + track_2_steering_angles
+
+# images = track_1_images + track_1_opp_images + track_2_images
+# steering_angles = track_1_steering_angles + track_1_opp_steering_angles + track_2_steering_angles
 
 nb_bins = 25
 hist, bins = np.histogram(steering_angles, bins=nb_bins)
