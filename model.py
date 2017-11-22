@@ -107,14 +107,14 @@ model.compile(optimizer=Adam(lr=0.0001), loss='mse')
 
 # 4. fit the model
 
-X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, shuffle=True)
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.1, shuffle=True)
 
 batch_size = 32
 
 history = model.fit_generator(
     generator(X_train, y_train, batch_size),
     steps_per_epoch=len(X_train),
-    epochs=10,
+    epochs=13,
     validation_data=generator(X_valid, y_valid, batch_size),
     validation_steps=len(X_valid) // batch_size)
 

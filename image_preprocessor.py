@@ -19,7 +19,26 @@ def flip_random(image, steering_angle):
     return image, steering_angle
 
 
-def translate_random(image, steering_angle, range_x=100, range_y=10):
+def shadow_random(image, steering_angle):
+    x1, y1 = 200 * np.random.rand(), 0
+    x2, y2 = 200 * np.random.rand(), 66
+    xm, ym = np.mgrid[0:66, 0:200]
+
+    mask = np.zeros_like(image[:, :, 1])
+    mask[(ym - y1) * (x2 - x1) - (y2 - y1) * (xm - x1) > 0] = 1
+
+    cond = mask == np.random.randint(2)
+    s_ratio = np.random.uniform(low=0.2, high=0.5)
+
+    hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    hls[:, :, 1][cond] = hls[:, :, 1][cond] * s_ratio
+
+    shadowed = cv2.cvtColor(hls, cv2.COLOR_HLS2RGB)
+
+    return shadowed, steering_angle
+
+
+def translate_random(image, steering_angle, range_x=50, range_y=10):
     trans_x = range_x * (np.random.rand() - 0.5)
     trans_y = range_y * (np.random.rand() - 0.5)
     steering_angle += trans_x * 0.002
@@ -46,6 +65,7 @@ def pipeline(image, steering_angle):
     image, steering_angle = translate_random(image, steering_angle)
     image, steering_angle = brightness_random(image, steering_angle)
     image, steering_angle = flip_random(image, steering_angle)
+    image, steering_angle = shadow_random(image, steering_angle)
 
     return image, steering_angle
 
@@ -60,7 +80,6 @@ def generator(X, y, batch_size=32):
             X_batch[i], y_batch[i] = pipeline(X[index], y[index])
 
         yield X_batch, y_batch
-
 
 # path = 'data/track_1/IMG/center_2017_11_19_09_11_30_980.jpg'
 # image = cv2.imread(path)
