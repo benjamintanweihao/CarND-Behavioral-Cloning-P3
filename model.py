@@ -1,16 +1,15 @@
 from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D, Cropping2D
+from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D
 from keras.optimizers import Adam
-from keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
 
 import csv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from random import random
+from random import random, choice, uniform
 
-from image_preprocessor import preprocess_image
+from image_preprocessor import preprocess_image, pipeline, generator
 
 
 def populate_data(path_to_csv):
@@ -25,24 +24,23 @@ def populate_data(path_to_csv):
             left_image_path = row[1]
             right_image_path = row[2]
 
-            correction = 0.25
+            correction = 0.20
             center_steering_angle = float(row[3])
 
-            left_steering_angle = center_steering_angle + correction
-            right_steering_angle = center_steering_angle - correction
+            c = choice(range(3))
 
-            center_img = preprocess_image(cv2.imread(center_image_path))
-            left_img = preprocess_image(cv2.imread(left_image_path))
-            right_img = preprocess_image(cv2.imread(right_image_path))
+            if c == 0:
+                image = preprocess_image(cv2.imread(center_image_path))
+                steering_angle = center_steering_angle
+            elif c == 1:
+                image = preprocess_image(cv2.imread(left_image_path))
+                steering_angle = center_steering_angle + correction
+            else:
+                image = preprocess_image(cv2.imread(right_image_path))
+                steering_angle = center_steering_angle - correction
 
-            images.append(center_img)
-            steering_angles.append(center_steering_angle)
-
-            images.append(left_img)
-            steering_angles.append(left_steering_angle)
-
-            images.append(right_img)
-            steering_angles.append(right_steering_angle)
+            images.append(image)
+            steering_angles.append(steering_angle)
 
         return images, steering_angles
 
@@ -51,25 +49,51 @@ def populate_data(path_to_csv):
 
 track_1_images, track_1_steering_angles = populate_data('data/track_1/driving_log.csv')
 
-X = np.array(track_1_images)
-y = np.array(track_1_steering_angles)
+images = track_1_images
+steering_angles = track_1_steering_angles
 
-plt.hist(y, linestyle='solid')
-plt.show()
+nb_bins = 25
+hist, bins = np.histogram(steering_angles, bins=nb_bins)
+
+avg_samples_per_bin = len(steering_angles) // nb_bins
+print(avg_samples_per_bin)
+
+# compute keep_prob
+keep_probs = []
+threshold = avg_samples_per_bin * 0.5
+
+for i in range(nb_bins):
+    if hist[i] < threshold: # below avg
+        keep_probs.append(1.0)
+    else:
+        keep_probs.append(1.0/(hist[i]/threshold))
+
+# based on the frequency of the steering angle, compute indices to remove
+remove_indices = []
+
+for i in range(len(steering_angles)):
+    for j in range(nb_bins):
+        if bins[j] < steering_angles[i] <= bins[j+1]:
+            if np.random.rand() > keep_probs[j]:
+                remove_indices.append(i)
+
+X = np.delete(np.array(images), remove_indices, axis=0)
+y = np.delete(np.array(steering_angles), remove_indices)
+
+# plt.hist(y, bins=nb_bins)
+# plt.show()
 
 # 2. create the model
 
 model = Sequential()
-model.add(Lambda(lambda image: image / 127.5, input_shape=(66, 200, 3), output_shape=(66, 200, 3)))
-model.add(Conv2D(3, 5, strides=(1, 1), padding='valid', activation='elu'))
-model.add(MaxPool2D(pool_size=(2, 2)))
-model.add(Conv2D(24, 5, strides=(1, 1), padding='valid', activation='elu'))
-model.add(MaxPool2D(pool_size=(2, 2)))
-model.add(Conv2D(36, 5, strides=(1, 1), padding='valid', activation='elu'))
-model.add(Conv2D(48, 3, strides=(1, 1), padding='valid', activation='elu'))
+model.add(Lambda(lambda image: image / 127.5 - 1, input_shape=(66, 200, 3), output_shape=(66, 200, 3)))
+model.add(Conv2D(24, 5, strides=(2, 2), padding='valid', activation='elu'))
+model.add(Conv2D(36, 5, strides=(2, 2), padding='valid', activation='elu'))
+model.add(Conv2D(48, 5, strides=(2, 2), padding='valid', activation='elu'))
+model.add(Conv2D(64, 3, strides=(1, 1), padding='valid', activation='elu'))
 model.add(Conv2D(64, 3, strides=(1, 1), padding='valid', activation='elu'))
 model.add(Flatten())
-model.add(Dense(1164, activation='elu'))
+model.add(Dropout(0.50))
 model.add(Dense(100, activation='elu'))
 model.add(Dense(50, activation='elu'))
 model.add(Dense(10, activation='elu'))
@@ -85,26 +109,14 @@ model.compile(optimizer=Adam(lr=0.0001), loss='mse')
 
 X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, shuffle=True)
 
-datagen = ImageDataGenerator(
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    horizontal_flip=False,
-    vertical_flip=False)
+batch_size = 32
 
-# train_generator = datagen.flow(X_train, y_train, batch_size=32)
-
-# history = model.fit_generator(
-#     train_generator,
-#     steps_per_epoch=len(X_train),
-#     epochs=3,
-#     validation_data=(X_valid, y_valid))
-
-history = model.fit(
-    X_train,
-    y_train,
-    epochs=3,
-    validation_data=(X_valid, y_valid))
+history = model.fit_generator(
+    generator(X_train, y_train, batch_size),
+    steps_per_epoch=len(X_train),
+    epochs=10,
+    validation_data=generator(X_valid, y_valid, batch_size),
+    validation_steps=len(X_valid) // batch_size)
 
 # 5. summarize history for loss
 
