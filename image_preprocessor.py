@@ -6,9 +6,16 @@ from random import choice, randint, uniform
 def preprocess_image(image):
     cropped = image[80:134]
     resized = cv2.resize(cropped, (200, 66), interpolation=cv2.INTER_AREA)
-    cvtcolor = cv2.cvtColor(resized, cv2.COLOR_RGB2YUV)
+    yuv = cv2.cvtColor(resized, cv2.COLOR_RGB2YUV)
+    blurred = blur(yuv)
 
-    return cvtcolor
+    return blurred
+
+
+def blur(image, kernel_size=5):
+    blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+
+    return blurred
 
 
 def flip_random(image, steering_angle):
@@ -69,11 +76,8 @@ def pipeline(image, steering_angle):
 
     return image, steering_angle
 
-def blur(image, kernel_size=5):
-    blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
-    return blurred
 
-def generator(X, y, batch_size=32):
+def generator(X, y, batch_size):
     X_batch = np.zeros(shape=(batch_size, 66, 200, 3), dtype=np.uint8)
     y_batch = np.zeros(shape=(batch_size, 1), dtype=np.float32)
 
@@ -83,20 +87,3 @@ def generator(X, y, batch_size=32):
             X_batch[i], y_batch[i] = pipeline(X[index], y[index])
 
         yield X_batch, y_batch
-
-# path = 'data/track_1/IMG/center_2017_11_19_09_11_30_980.jpg'
-# image = cv2.imread(path)
-#
-# X = np.array([preprocess_image(image)])
-# y = np.array([10])
-#
-# a, b = pipeline(preprocess_image(image), 1)
-#
-# cv2.imshow('',  a)
-# cv2.waitKey(0)
-#
-# # print(cv2.imshow('', (next(gen)).shape))
-#
-# augmented, angle = translate_random(image, 0)
-# cv2.imshow(str(angle), augmented)
-# cv2.waitKey(0)

@@ -1,15 +1,16 @@
 from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda, MaxPool2D
+from keras.layers import Conv2D, Dense, Dropout, Flatten, Lambda
 from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.model_selection import train_test_split
 
 import csv
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from random import random, choice, uniform
+from random import choice
 
-from image_preprocessor import preprocess_image, pipeline, generator
+from image_preprocessor import preprocess_image, generator
 
 
 def populate_data(path_to_csv):
@@ -48,45 +49,45 @@ def populate_data(path_to_csv):
 # 1. populate X_train and y_train
 
 track_1_images, track_1_steering_angles = populate_data('data/track_1/driving_log.csv')
-# track_1_opp_images, track_1_opp_steering_angles = populate_data('data/track_1_opp/driving_log.csv')
-track_2_images, track_2_steering_angles = populate_data('data/track_2/driving_log.csv')
 
-images = track_1_images + track_2_images
-steering_angles = track_1_steering_angles + track_2_steering_angles
+images = track_1_images
+steering_angles = track_1_steering_angles
 
-# images = track_1_images + track_1_opp_images + track_2_images
-# steering_angles = track_1_steering_angles + track_1_opp_steering_angles + track_2_steering_angles
 
-nb_bins = 25
-hist, bins = np.histogram(steering_angles, bins=nb_bins)
+def resample_data(images, steering_angles):
+    nb_bins = 25
+    hist, bins = np.histogram(steering_angles, bins=nb_bins)
+    avg_samples_per_bin = len(steering_angles) // nb_bins
 
-avg_samples_per_bin = len(steering_angles) // nb_bins
-print(avg_samples_per_bin)
+    # compute keep_prob
+    keep_probs = []
+    threshold = avg_samples_per_bin * 0.5
 
-# compute keep_prob
-keep_probs = []
-threshold = avg_samples_per_bin * 0.5
+    for i in range(nb_bins):
+        if hist[i] < threshold:  # below avg
+            keep_probs.append(1.0)
+        else:
+            keep_probs.append(1.0 / (hist[i] / threshold))
 
-for i in range(nb_bins):
-    if hist[i] < threshold: # below avg
-        keep_probs.append(1.0)
-    else:
-        keep_probs.append(1.0/(hist[i]/threshold))
+    # based on the frequency of the steering angle, compute indices to remove
+    remove_indices = []
 
-# based on the frequency of the steering angle, compute indices to remove
-remove_indices = []
+    for i in range(len(steering_angles)):
+        for j in range(nb_bins):
+            if bins[j] < steering_angles[i] <= bins[j + 1]:
+                if np.random.rand() > keep_probs[j]:
+                    remove_indices.append(i)
 
-for i in range(len(steering_angles)):
-    for j in range(nb_bins):
-        if bins[j] < steering_angles[i] <= bins[j+1]:
-            if np.random.rand() > keep_probs[j]:
-                remove_indices.append(i)
+    X = np.delete(np.array(images), remove_indices, axis=0)
+    y = np.delete(np.array(steering_angles), remove_indices)
 
-X = np.delete(np.array(images), remove_indices, axis=0)
-y = np.delete(np.array(steering_angles), remove_indices)
+    # plt.hist(y, bins=nb_bins)
+    # plt.show()
 
-# plt.hist(y, bins=nb_bins)
-# plt.show()
+    return X, y
+
+
+X, y = resample_data(images, steering_angles)
 
 # 2. create the model
 
@@ -116,12 +117,25 @@ X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.1, shuff
 
 batch_size = 32
 
+callbacks_list = [
+    EarlyStopping(
+        monitor='val_loss',
+        patience=1
+    ),
+    ModelCheckpoint(
+        'model.h5',
+        monitor='val_loss',
+        save_best_only=True
+    )
+]
+
 history = model.fit_generator(
     generator(X_train, y_train, batch_size),
     steps_per_epoch=len(X_train),
-    epochs=13,
+    epochs=10,
     validation_data=generator(X_valid, y_valid, batch_size),
-    validation_steps=len(X_valid) // batch_size)
+    validation_steps=100,
+    callbacks=callbacks_list)
 
 # 5. summarize history for loss
 
