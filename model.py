@@ -81,8 +81,8 @@ def resample_data(images, steering_angles):
     X = np.delete(np.array(images), remove_indices, axis=0)
     y = np.delete(np.array(steering_angles), remove_indices)
 
-    # plt.hist(y, bins=nb_bins)
-    # plt.show()
+    plt.hist(y, bins=nb_bins)
+    plt.show()
 
     return X, y
 
